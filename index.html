@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex,nofollow">
+<title>لوحة التحكم</title>
+<link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+:root{--gold:#b8924a;--gold-d:#8a6a2e;--ivory:#fbf7ef;--line:#e3d3b2;--ink:#4a3d2a}
+*{box-sizing:border-box;margin:0}
+body{font-family:"Tajawal",-apple-system,"Geeza Pro",sans-serif;background:var(--ivory);color:var(--ink);padding:16px env(safe-area-inset-right) 40px;overflow-x:hidden;line-height:1.7}
+main{max-width:720px;margin:0 auto;padding:0 12px}
+h1{color:var(--gold-d);font-size:1.5rem;margin:8px 0 14px}
+input,select,button{font:inherit;padding:12px 14px;border-radius:10px;border:1px solid var(--line);background:#fff;color:var(--ink);width:100%}
+button{cursor:pointer;min-height:44px;border:0;background:var(--gold-d);color:#fff;font-weight:500}
+button.ghost{background:#fff;color:var(--gold-d);border:1px solid var(--gold-d)}
+button.del{background:#a63a2b;width:auto;padding:6px 14px;min-height:36px}
+.box{display:grid;gap:10px;background:#fff;border:1px solid var(--line);border-radius:14px;padding:18px}
+.bar{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:12px 0}
+.bar input{grid-column:1/-1}
+.top{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.top button{width:auto}
+.card{background:#fff;border:1px solid var(--line);border-radius:14px;padding:14px;margin-bottom:10px}
+.card .meta{display:flex;justify-content:space-between;gap:8px;font-size:.85rem;color:#7a6a4d;margin-bottom:6px;align-items:center}
+.card b{color:var(--gold-d)}
+.card p{white-space:pre-wrap;overflow-wrap:anywhere}
+.err{color:#a63a2b}.hide{display:none}
+</style>
+</head>
+<body>
+<main>
+<div id="login" class="box">
+  <h1>دخول المسؤول</h1>
+  <input id="em" type="email" placeholder="البريد الإلكتروني" autocomplete="username" dir="ltr">
+  <input id="pw" type="password" placeholder="كلمة المرور" autocomplete="current-password" dir="ltr">
+  <button id="in">دخول</button>
+  <p id="le" class="err"></p>
+</div>
+
+<div id="dash" class="hide">
+  <div class="top"><h1>التهاني <span id="cnt"></span></h1><button class="ghost" id="out">تسجيل الخروج</button></div>
+  <div class="bar">
+    <input id="q" type="search" placeholder="ابحث بالاسم أو في الرسالة">
+    <select id="rng"><option value="0">كل التواريخ</option><option value="1">آخر ٢٤ ساعة</option><option value="7">آخر ٧ أيام</option></select>
+    <select id="ord"><option value="d">الأحدث أولاً</option><option value="a">الأقدم أولاً</option></select>
+  </div>
+  <p id="de" class="err"></p>
+  <div id="list"></div>
+</div>
+</main>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script src="../config.js"></script>
+<script>
+(function(){
+var C=window.SITE_CONFIG||{},$=function(i){return document.getElementById(i)};
+var db=window.supabase.createClient(C.SUPABASE_URL,C.SUPABASE_ANON_KEY),rows=[];
+function show(on){$("login").classList.toggle("hide",on);$("dash").classList.toggle("hide",!on)}
+async function load(){
+ $("de").textContent="";
+ var r=await db.from("congratulations").select("id,guest_name,message,created_at").order("created_at",{ascending:false}).limit(1000);
+ if(r.error){$("de").textContent="تعذر تحميل الرسائل. تأكد أن هذا الحساب هو حساب المسؤول.";rows=[]}else rows=r.data||[];
+ render()}
+function render(){
+ var q=$("q").value.trim().toLowerCase(),days=+$("rng").value,asc=$("ord").value==="a",now=Date.now();
+ var f=rows.filter(function(x){
+  if(days&&now-new Date(x.created_at)>days*864e5)return false;
+  return !q||(x.guest_name+" "+x.message).toLowerCase().indexOf(q)>-1});
+ if(asc)f=f.slice().reverse();
+ $("cnt").textContent="("+f.length+" من "+rows.length+")";
+ var L=$("list");L.textContent="";
+ if(!f.length){var e=document.createElement("p");e.textContent="لا توجد رسائل.";L.appendChild(e);return}
+ f.forEach(function(x){
+  var c=document.createElement("div");c.className="card";
+  var m=document.createElement("div");m.className="meta";
+  var n=document.createElement("b");n.textContent=x.guest_name;
+  var d=document.createElement("span");d.textContent=new Date(x.created_at).toLocaleString("ar-EG",{dateStyle:"medium",timeStyle:"short"});
+  var b=document.createElement("button");b.className="del";b.textContent="حذف";
+  b.onclick=async function(){
+   if(!confirm("حذف هذه الرسالة نهائياً؟"))return;
+   var r=await db.from("congratulations").delete().eq("id",x.id);
+   if(r.error){alert("تعذر الحذف");return}
+   rows=rows.filter(function(y){return y.id!==x.id});render()};
+  m.append(n,d,b);
+  var p=document.createElement("p");p.textContent=x.message;
+  c.append(m,p);L.appendChild(c)})}
+$("in").onclick=async function(){
+ $("le").textContent="";
+ var r=await db.auth.signInWithPassword({email:$("em").value.trim(),password:$("pw").value});
+ if(r.error){$("le").textContent="بيانات الدخول غير صحيحة.";return}
+ $("pw").value="";show(true);load()};
+$("pw").addEventListener("keydown",function(e){if(e.key==="Enter")$("in").click()});
+$("out").onclick=async function(){await db.auth.signOut();rows=[];show(false)};
+["q","rng","ord"].forEach(function(i){$(i).addEventListener("input",render)});
+db.auth.getSession().then(function(s){if(s.data.session){show(true);load()}});
+})();
+</script>
+</body>
+</html>
