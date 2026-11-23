@@ -1,7 +1,7 @@
 # Fayez & Sylvia wedding site: setup from an iPhone
 
 Files:
-- `index2.html` the invitation
+- `index.html` the invitation
 - `admin/index.html` the private dashboard (opens at `/admin/`)
 - `config.js` the ONLY file you edit (keys + map links)
 - `supabase-setup.sql` creates the database and security rules
